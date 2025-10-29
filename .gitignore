@@ -1,0 +1,200 @@
+# ------------------------------
+# OS / Editor junk
+# ------------------------------
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+*.temp
+~$*
+
+# Vim/Emacs
+.*.sw?
+*~
+#*#
+/.project
+/.classpath
+/.settings/
+
+# JetBrains
+*.iml
+.idea/
+
+# VS Code
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+
+# ------------------------------
+# General
+# ------------------------------
+*.log
+logs/
+*.pid
+*.seed
+*.orig
+*.rej
+*.bak
+*.backup
+*.old
+*.out
+*.err
+
+# Archives
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# Certificates and keys
+*.crt
+*.crl
+*.key
+*.pem
+*.p12
+*.cer
+*.der
+*.csr
+
+# Documents (requested)
+*.pdf
+
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Local data
+*.sqlite
+*.sqlite3
+*.db
+*.db-*
+
+# ------------------------------
+# Node / Frontend
+# ------------------------------
+node_modules/
+bower_components/
+.pnp/
+.pnp.cjs
+.pnpm-store/
+.npm/
+.npmrc*
+.yarn-cache/
+.yarn/
+.yarnrc*
+yarn-error.log
+package-lock.json
+# If you prefer to track lockfiles, remove the line above
+
+# Builds / caches
+build/
+dist/
+.out/
+.next/
+.nuxt/
+.svelte-kit/
+.storybook-out/
+coverage/
+.nyc_output/
+.cache/
+.turbo/
+.vite/
+.vitest/
+.eslintcache
+.stylelintcache
+
+# Framework specifics
+.Deno/
+.astro/
+.vercel/
+.netlify/
+
+# ------------------------------
+# Python
+# ------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Packaging
+build/
+dist/
+.eggs/
+*.egg-info/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.pyre/
+.pytype/
+.ipynb_checkpoints/
+
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+
+# ------------------------------
+# Go
+# ------------------------------
+bin/
+cover.out
+vendor/
+
+# ------------------------------
+# Rust
+# ------------------------------
+/target/
+
+# ------------------------------
+# Java / JVM
+# ------------------------------
+.gradle/
+.build/
+.classpath
+.project
+.settings/
+
+# Maven / Gradle outputs
+/target/
+/build/
+
+# ------------------------------
+# Docker
+# ------------------------------
+.docker/
+**/.dockerignore.local
+
+# ------------------------------
+# Terraform
+# ------------------------------
+.terraform/
+*.tfstate
+*.tfstate.*
+.crash
+.terraform.lock.hcl
+
+# ------------------------------
+# Misc tool caches
+# ------------------------------
+.swc/
+.parcel-cache/
+.cache-loader/
+.happypack/
+
+# ------------------------------
+# Local secrets (defense-in-depth)
+# ------------------------------
+secrets.*
+*.secret
+*.secrets.*
