@@ -61,8 +61,6 @@ logs/
 
 # Documents (requested)
 *.pdf
-*.csv
-*.CSV
 
 # Environment files
 .env
@@ -200,3 +198,8 @@ vendor/
 secrets.*
 *.secret
 *.secrets.*
+
+# ------------------------------
+# Project-specific
+# ------------------------------
+/README.ru
