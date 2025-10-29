@@ -62,6 +62,9 @@ logs/
 # Documents (requested)
 *.pdf
 
+# Data files
+*.csv
+
 # Environment files
 .env
 .env.*
