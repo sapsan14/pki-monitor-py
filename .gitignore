@@ -203,3 +203,7 @@ secrets.*
 # Project-specific
 # ------------------------------
 /README.ru
+artifacts/
+my_pki_data/
+results.csv
+my_results.csv

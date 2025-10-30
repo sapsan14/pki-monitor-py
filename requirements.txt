@@ -1,0 +1,40 @@
+# PKI Monitor Python Dependencies
+# Core Python libraries (included in standard library)
+# - urllib.request, urllib.error
+# - hashlib
+# - subprocess
+# - socket
+# - csv
+# - pathlib
+# - datetime
+# - tempfile
+# - os
+# - time
+# - argparse
+
+# External dependencies for enhanced functionality (optional)
+# Uncomment if you want to add these features:
+
+# For better HTTP handling and SSL support
+# requests>=2.31.0
+
+# For LDAP operations (alternative to system ldapsearch)
+# python-ldap>=3.4.0
+
+# For enhanced CSV handling
+# pandas>=2.0.0
+
+# For better logging
+# loguru>=0.7.0
+
+# For configuration management
+# pyyaml>=6.0
+
+# For progress bars
+# tqdm>=4.65.0
+
+# Note: This application is designed to work with minimal dependencies
+# using only Python standard library components for maximum compatibility.
+
+# UI
+streamlit>=1.36.0
