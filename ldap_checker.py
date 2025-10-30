@@ -4,11 +4,12 @@ LDAP Checker Module
 Handles LDAP/LDAPS connectivity and query testing for PKI services.
 """
 
-import os
 import socket
-import subprocess
+import ssl
 import time
 from typing import Dict, List, Optional
+
+from ldap3 import Server, Connection, Tls, LEVEL
 
 
 class LDAPChecker:
@@ -91,68 +92,41 @@ class LDAPChecker:
             }
     
     def _check_ldap_query(self, protocol: str) -> Dict:
-        """Check LDAP query via specified protocol (ldap/ldaps)."""
+        """Check LDAP query via specified protocol (ldap/ldaps) using ldap3."""
         timestamp = self._timestamp()
         start_time = time.time()
         
         print(f"[{timestamp}] Checking LDAP query via {protocol}://{self.LDAP_HOST} ...")
         
         try:
-            # Prepare environment for LDAP search
-            env = os.environ.copy()
-            if protocol == "ldaps":
-                # Disable certificate verification for LDAPS
-                env['LDAPTLS_REQCERT'] = 'never'
-            
-            # Build ldapsearch command
-            url = f"{protocol}://{self.LDAP_HOST}"
-            cmd = [
-                'ldapsearch',
-                '-x',  # Simple bind
-                '-H', url,
-                '-b', self.LDAP_BASE,
-                '-s', 'one',  # Search scope
-                self.LDAP_FILTER,
-                'cn'  # Return only cn attribute
-            ]
-            
-            # Run ldapsearch command
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=self.TIMEOUT,
-                env=env
+            use_ssl = protocol == "ldaps"
+            tls = None
+            if use_ssl:
+                # Mirror previous behavior for ldaps: do not require valid server cert
+                tls = Tls(validate=ssl.CERT_NONE)
+            server = Server(self.LDAP_HOST, use_ssl=use_ssl, connect_timeout=self.TIMEOUT, tls=tls)
+            conn = Connection(server, auto_bind=True, receive_timeout=self.TIMEOUT)
+
+            # one-level search (equivalent to ldapsearch -s one)
+            success = conn.search(
+                search_base=self.LDAP_BASE,
+                search_filter=self.LDAP_FILTER,
+                search_scope=LEVEL,
+                attributes=["cn"],
+                time_limit=self.TIMEOUT,
             )
-            
+
             duration_ms = int((time.time() - start_time) * 1000)
-            
-            if result.returncode == 0:
-                # Check if we got valid LDAP entries
-                output_lines = result.stdout.split('\n')
-                dn_lines = [line for line in output_lines if line.startswith('dn:')]
-                
-                if dn_lines:
-                    dn_line = dn_lines[0]
-                    print(f"[{timestamp}] ✅ Entry found: {dn_line}")
-                    note = 'found'
-                else:
-                    print(f"[{timestamp}] ⚠️ Response received, but no entries found")
-                    note = 'empty'
-                
-                return {
-                    'timestamp': timestamp,
-                    'type': 'ldap_search',
-                    'url_or_host': url,
-                    'status': 'ok',
-                    'http_code_or_port': protocol.upper(),
-                    'ms': str(duration_ms),
-                    'filepath_or_note': '',
-                    'sha256_or_note': '',
-                    'note': note
-                }
+
+            if success and conn.entries:
+                first = str(conn.entries[0].entry_dn)
+                print(f"[{timestamp}] ✅ Entry found: dn: {first}")
+                note = 'found'
+            elif success:
+                print(f"[{timestamp}] ⚠️ Response received, but no entries found")
+                note = 'empty'
             else:
-                print(f"[{timestamp}] ❌ ldapsearch error: {result.stderr}")
+                print(f"[{timestamp}] ❌ LDAP search returned no result (operation failed)")
                 return {
                     'timestamp': timestamp,
                     'type': 'ldap_search',
@@ -162,23 +136,21 @@ class LDAPChecker:
                     'ms': str(duration_ms),
                     'filepath_or_note': '',
                     'sha256_or_note': '',
-                    'note': f'ldapsearch error: {result.stderr}'
+                    'note': 'operation failed'
                 }
-        
-        except subprocess.TimeoutExpired:
-            duration_ms = int((time.time() - start_time) * 1000)
-            print(f"[{timestamp}] ❌ LDAP query timeout")
+
             return {
                 'timestamp': timestamp,
                 'type': 'ldap_search',
                 'url_or_host': f"{protocol}://{self.LDAP_HOST}",
-                'status': 'fail',
+                'status': 'ok',
                 'http_code_or_port': protocol.upper(),
                 'ms': str(duration_ms),
                 'filepath_or_note': '',
                 'sha256_or_note': '',
-                'note': 'Query timeout'
+                'note': note
             }
+        
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
             print(f"[{timestamp}] ❌ LDAP query error: {e}")

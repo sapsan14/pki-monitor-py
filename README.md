@@ -42,7 +42,7 @@ This project has been converted from bash scripts to a unified Python CLI applic
 ## ⚙️ Requirements
 - Python 3.7 or higher
 - `openssl` (for OCSP checks)
-- `ldap-utils` (for LDAP checks)
+- Python package `ldap3` (installed via `requirements.txt`)
 - Internet access to `*.eidpki.ee` services
 
 ## 🚀 Installation
@@ -88,6 +88,8 @@ pip install -r requirements.txt
 streamlit run streamlit_app.py
 ```
 The UI lets you configure the artifacts directory and CSV log file, run checks, view a live summary, and browse/download the latest results.
+
+Note: LDAP checks now use the pure-Python `ldap3` library (no system `ldapsearch`/`ldap-utils` required), which runs on Streamlit Cloud.
 
 ### Advanced Usage
 ```bash

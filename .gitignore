@@ -59,6 +59,7 @@ logs/
 *.der
 *.csr
 
+
 # Documents (requested)
 *.pdf
 
@@ -204,6 +205,9 @@ secrets.*
 # ------------------------------
 /README.ru
 artifacts/
+!artifacts/crt/
+!artifacts/crt/ESTEID2025.crt
+!artifacts/crt/mycert.crt
 my_pki_data/
 results.csv
 my_results.csv

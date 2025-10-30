@@ -18,8 +18,8 @@
 # For better HTTP handling and SSL support
 # requests>=2.31.0
 
-# For LDAP operations (alternative to system ldapsearch)
-# python-ldap>=3.4.0
+# For LDAP operations (pure Python, Streamlit Cloud compatible)
+ldap3>=2.9
 
 # For enhanced CSV handling
 # pandas>=2.0.0
