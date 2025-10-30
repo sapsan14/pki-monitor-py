@@ -14,6 +14,7 @@ import mimetypes
 import os
 
 import streamlit as st
+import hashlib
 
 from pki_monitor import PKIMonitor
 
@@ -89,8 +90,30 @@ def clear_artifacts(artifacts_path: Path):
 
 def main():
     st.set_page_config(page_title="PKI Monitor", page_icon="🧪", layout="wide")
+    # --- Basic auth gate (very simple; for private deployments only) ---
+    USER = os.environ.get("PKI_UI_USER", "admin")
+    PASSWORD_HASH = os.environ.get(
+        "PKI_UI_PASSWORD_HASH",
+        hashlib.sha256("secret123".encode()).hexdigest(),
+    )
+
     st.title("🧪 PKI Site Health Check")
     st.caption("Monitor ZETES / eID PKI services")
+
+    if "authenticated" not in st.session_state:
+        st.session_state["authenticated"] = False
+
+    if not st.session_state["authenticated"]:
+        st.subheader("🔐 Private Access")
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+        if st.button("Login"):
+            if username == USER and hashlib.sha256(password.encode()).hexdigest() == PASSWORD_HASH:
+                st.session_state["authenticated"] = True
+                st.rerun()
+            else:
+                st.error("❌ Invalid credentials")
+        st.stop()
 
     with st.sidebar:
         st.header("Settings")

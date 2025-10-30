@@ -91,6 +91,20 @@ The UI lets you configure the artifacts directory and CSV log file, run checks, 
 
 Note: LDAP checks now use the pure-Python `ldap3` library (no system `ldapsearch`/`ldap-utils` required), which runs on Streamlit Cloud.
 
+#### Optional: Simple UI authentication
+The app includes a very basic username/password gate suitable for private demos. Configure via environment variables (or keep defaults `admin` / `secret123`).
+
+```bash
+export PKI_UI_USER="admin"
+export PKI_UI_PASSWORD_HASH="$(python - <<'PY'
+import hashlib
+print(hashlib.sha256("secret123".encode()).hexdigest())
+PY
+)"
+streamlit run streamlit_app.py
+```
+Security note: This is minimal. For production, use Streamlit Cloud access controls or a proper auth proxy.
+
 ### Advanced Usage
 ```bash
 # Use custom artifacts directory
