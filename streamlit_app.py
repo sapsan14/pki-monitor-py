@@ -119,6 +119,13 @@ def main():
 
     with st.sidebar:
         st.header("Settings")
+        
+        # Logout button
+        if st.button("🚪 Logout", type="secondary"):
+            st.session_state["authenticated"] = False
+            st.rerun()
+        
+        st.markdown("---")
         artifacts_dir = st.text_input("Artifacts directory", value="./artifacts")
         log_csv = st.text_input("CSV log file", value="./results.csv")
         st.markdown("---")
