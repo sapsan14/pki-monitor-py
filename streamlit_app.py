@@ -80,15 +80,22 @@ def main():
     # --- Basic auth gate (very simple; for private deployments only) ---
     # Try to get from Streamlit secrets first, fallback to environment variables or defaults
     try:
-        # Use dictionary-like access instead of .get() to raise exception if missing
-        auth_config = st.secrets["auth"]
+        # Show what secrets are available (for debugging)
+        secrets_keys = list(st.secrets.keys()) if hasattr(st.secrets, 'keys') else []
+        if secrets_keys:
+            st.sidebar.info(f"Available secrets: {', '.join(secrets_keys)}")
+        else:
+            st.sidebar.warning("No secrets found at all!")
+        
+        # Try to get auth config
+        auth_config = st.secrets.get("auth", {})
         USER = auth_config.get("username", "admin")
         PASSWORD_HASH = auth_config.get("password_hash", "")
         
         # Debug: show what was loaded
         if not PASSWORD_HASH and "password" in auth_config:
             PASSWORD_HASH = hashlib.sha256(auth_config["password"].encode()).hexdigest()
-            st.sidebar.info("✅ Using password from secrets")
+            st.sidebar.success("✅ Using password from secrets")
         else:
             st.sidebar.info("⚠️ No password in secrets")
         
@@ -96,17 +103,9 @@ def main():
         if not PASSWORD_HASH:
             PASSWORD_HASH = hashlib.sha256("secret123".encode()).hexdigest()
             st.sidebar.warning("⚠️ Using default password 'secret123'")
-    except KeyError:
-        # Fallback to environment variables or defaults
-        st.sidebar.error("❌ Auth secrets not found!")
-        USER = os.environ.get("PKI_UI_USER", "admin")
-        PASSWORD_HASH = os.environ.get(
-            "PKI_UI_PASSWORD_HASH",
-            hashlib.sha256("secret123".encode()).hexdigest(),
-        )
     except Exception as e:
         # For any other exception, show a warning
-        st.sidebar.warning(f"⚠️ Could not load secrets: {e}")
+        st.sidebar.error(f"⚠️ Could not load secrets: {e}")
         USER = os.environ.get("PKI_UI_USER", "admin")
         PASSWORD_HASH = os.environ.get(
             "PKI_UI_PASSWORD_HASH",
