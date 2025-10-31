@@ -80,9 +80,13 @@ def main():
     # --- Basic auth gate (very simple; for private deployments only) ---
     # Try to get from Streamlit secrets first, fallback to environment variables or defaults
     try:
-        auth_config = st.secrets.get("auth", {})
+        # Use dictionary-like access instead of .get() to raise exception if missing
+        auth_config = st.secrets["auth"]
         USER = auth_config.get("username", "admin")
         PASSWORD_HASH = auth_config.get("password_hash", "")
+        
+        # Debug: show what was loaded (remove in production)
+        st.sidebar.debug(f"Auth config loaded: username={USER}, has_password={bool(PASSWORD_HASH)}")
         
         # If password_hash is empty, generate it from password field if available
         if not PASSWORD_HASH and "password" in auth_config:
@@ -90,9 +94,21 @@ def main():
         
         # If still empty, use default hash
         if not PASSWORD_HASH:
+            st.sidebar.debug("No password found, using default 'secret123'")
             PASSWORD_HASH = hashlib.sha256("secret123".encode()).hexdigest()
-    except Exception:
+        else:
+            st.sidebar.debug("Using password from secrets")
+    except KeyError:
         # Fallback to environment variables or defaults
+        st.sidebar.debug("Auth config not found in secrets, using environment/defaults")
+        USER = os.environ.get("PKI_UI_USER", "admin")
+        PASSWORD_HASH = os.environ.get(
+            "PKI_UI_PASSWORD_HASH",
+            hashlib.sha256("secret123".encode()).hexdigest(),
+        )
+    except Exception as e:
+        # For any other exception, show a warning
+        st.sidebar.warning(f"⚠️ Could not load secrets: {e}")
         USER = os.environ.get("PKI_UI_USER", "admin")
         PASSWORD_HASH = os.environ.get(
             "PKI_UI_PASSWORD_HASH",
