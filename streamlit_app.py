@@ -85,18 +85,20 @@ def main():
         USER = auth_config.get("username", "admin")
         PASSWORD_HASH = auth_config.get("password_hash", "")
         
-        # Debug: show what was loaded (remove in production)
-        # Using print instead of st.debug/st.sidebar.debug as they don't exist in older Streamlit versions
-        
-        # If password_hash is empty, generate it from password field if available
+        # Debug: show what was loaded
         if not PASSWORD_HASH and "password" in auth_config:
             PASSWORD_HASH = hashlib.sha256(auth_config["password"].encode()).hexdigest()
+            st.sidebar.info("✅ Using password from secrets")
+        else:
+            st.sidebar.info("⚠️ No password in secrets")
         
         # If still empty, use default hash
         if not PASSWORD_HASH:
             PASSWORD_HASH = hashlib.sha256("secret123".encode()).hexdigest()
+            st.sidebar.warning("⚠️ Using default password 'secret123'")
     except KeyError:
         # Fallback to environment variables or defaults
+        st.sidebar.error("❌ Auth secrets not found!")
         USER = os.environ.get("PKI_UI_USER", "admin")
         PASSWORD_HASH = os.environ.get(
             "PKI_UI_PASSWORD_HASH",
