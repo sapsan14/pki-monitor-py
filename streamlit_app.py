@@ -92,11 +92,26 @@ def clear_artifacts(artifacts_path: Path):
 def main():
     st.set_page_config(page_title="PKI Monitor", page_icon="🧪", layout="wide")
     # --- Basic auth gate (very simple; for private deployments only) ---
-    USER = os.environ.get("PKI_UI_USER", "admin")
-    PASSWORD_HASH = os.environ.get(
-        "PKI_UI_PASSWORD_HASH",
-        hashlib.sha256("secret123".encode()).hexdigest(),
-    )
+    # Try to get from Streamlit secrets first, fallback to environment variables or defaults
+    try:
+        auth_config = st.secrets.get("auth", {})
+        USER = auth_config.get("username", "admin")
+        PASSWORD_HASH = auth_config.get("password_hash", "")
+        
+        # If password_hash is empty, generate it from password field if available
+        if not PASSWORD_HASH and "password" in auth_config:
+            PASSWORD_HASH = hashlib.sha256(auth_config["password"].encode()).hexdigest()
+        
+        # If still empty, use default hash
+        if not PASSWORD_HASH:
+            PASSWORD_HASH = hashlib.sha256("secret123".encode()).hexdigest()
+    except Exception:
+        # Fallback to environment variables or defaults
+        USER = os.environ.get("PKI_UI_USER", "admin")
+        PASSWORD_HASH = os.environ.get(
+            "PKI_UI_PASSWORD_HASH",
+            hashlib.sha256("secret123".encode()).hexdigest(),
+        )
 
     st.title("🧪 PKI Site Health Check")
     st.caption("Monitor ZETES / eID PKI services")

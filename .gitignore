@@ -199,6 +199,7 @@ vendor/
 secrets.*
 *.secret
 *.secrets.*
+.streamlit/secrets.toml
 
 # ------------------------------
 # Project-specific
