@@ -70,7 +70,6 @@ class LDAPChecker:
                 'status': status,
                 'http_code_or_port': str(port),
                 'ms': str(duration_ms),
-                'filepath_or_note': '',
                 'sha256_or_note': '',
                 'note': ''
             }
@@ -86,7 +85,6 @@ class LDAPChecker:
                 'status': 'fail',
                 'http_code_or_port': str(port),
                 'ms': str(duration_ms),
-                'filepath_or_note': '',
                 'sha256_or_note': '',
                 'note': str(e)
             }
@@ -134,7 +132,6 @@ class LDAPChecker:
                     'status': 'fail',
                     'http_code_or_port': protocol.upper(),
                     'ms': str(duration_ms),
-                    'filepath_or_note': '',
                     'sha256_or_note': '',
                     'note': 'operation failed'
                 }
@@ -146,7 +143,6 @@ class LDAPChecker:
                 'status': 'ok',
                 'http_code_or_port': protocol.upper(),
                 'ms': str(duration_ms),
-                'filepath_or_note': '',
                 'sha256_or_note': '',
                 'note': note
             }
@@ -161,7 +157,6 @@ class LDAPChecker:
                 'status': 'fail',
                 'http_code_or_port': protocol.upper(),
                 'ms': str(duration_ms),
-                'filepath_or_note': '',
                 'sha256_or_note': '',
                 'note': str(e)
             }

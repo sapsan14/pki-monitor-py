@@ -84,7 +84,7 @@ def test_csv_log_creation():
             if os.path.exists(log_csv):
                 with open(log_csv, 'r') as f:
                     first_line = f.readline().strip()
-                    expected_headers = "timestamp,type,url_or_host,status,http_code_or_port,ms,filepath_or_note,sha256_or_note,note"
+                    expected_headers = "timestamp,type,url_or_host,status,http_code_or_port,ms,sha256_or_note,note"
                     if first_line == expected_headers:
                         print("✅ CSV log file created with correct headers")
                         return True

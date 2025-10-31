@@ -46,8 +46,7 @@ class PKIMonitor:
                 writer = csv.writer(f)
                 writer.writerow([
                     'timestamp', 'type', 'url_or_host', 'status', 
-                    'http_code_or_port', 'ms', 'filepath_or_note', 
-                    'sha256_or_note', 'note'
+                    'http_code_or_port', 'ms', 'sha256_or_note', 'note'
                 ])
     
     def _log_result(self, result: Dict):
@@ -63,7 +62,6 @@ class PKIMonitor:
                 result.get('status', ''),
                 result.get('http_code_or_port', ''),
                 result.get('ms', ''),
-                result.get('filepath_or_note', ''),
                 result.get('sha256_or_note', ''),
                 result.get('note', '')
             ])

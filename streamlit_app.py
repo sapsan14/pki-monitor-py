@@ -7,7 +7,6 @@ and explore the latest results from the CSV log.
 """
 
 import csv
-from io import StringIO
 from pathlib import Path
 from typing import Dict, List
 import mimetypes
@@ -18,19 +17,6 @@ import hashlib
 
 from pki_monitor import PKIMonitor
 from ocsp_checker import OCSPChecker
-
-
-def read_csv_as_dicts(csv_path: Path, max_rows: int | None = None) -> List[Dict[str, str]]:
-    if not csv_path.exists():
-        return []
-    rows: List[Dict[str, str]] = []
-    with open(csv_path, "r", newline="") as f:
-        reader = csv.DictReader(f)
-        for idx, row in enumerate(reader):
-            rows.append(row)
-            if max_rows is not None and idx + 1 >= max_rows:
-                break
-    return rows
 
 
 def render_summary(monitor: PKIMonitor):
@@ -135,14 +121,22 @@ def main():
         st.header("Settings")
         artifacts_dir = st.text_input("Artifacts directory", value="./artifacts")
         log_csv = st.text_input("CSV log file", value="./results.csv")
-        last_n = st.slider("Show last N rows", min_value=5, max_value=200, value=50, step=5)
         st.markdown("---")
         run_checks = st.button("Run all checks", type="primary")
-        show_summary_only = st.button("Load summary from existing log")
         st.markdown("---")
         if st.button("Clear all artifacts", type="secondary"):
             clear_artifacts(Path(artifacts_dir).resolve())
             st.success("Artifacts cleared. Reload to refresh file lists.")
+        if st.button("Clear log", type="secondary"):
+            log_path_sidebar = Path(log_csv).resolve()
+            if log_path_sidebar.exists():
+                log_path_sidebar.unlink()
+                # Clear session state when log is cleared
+                if 'monitor_results' in st.session_state:
+                    st.session_state.monitor_results = None
+                st.success("Log cleared. Reload to refresh.")
+            else:
+                st.info("No log file found.")
 
     log_path = Path(log_csv).resolve()
     artifacts_path = Path(artifacts_dir).resolve()
@@ -150,124 +144,117 @@ def main():
     # Get artifact files list for UI
     artifact_files = list_artifacts(artifacts_path)
 
+    # Initialize session state for storing check results
+    if 'monitor_results' not in st.session_state:
+        st.session_state.monitor_results = None
+    if 'last_artifacts_path' not in st.session_state:
+        st.session_state.last_artifacts_path = None
+    if 'last_log_path' not in st.session_state:
+        st.session_state.last_log_path = None
+    
+    # Clear results if paths have changed
+    if (st.session_state.last_artifacts_path != str(artifacts_path) or 
+        st.session_state.last_log_path != str(log_path)):
+        st.session_state.monitor_results = None
+        st.session_state.last_artifacts_path = str(artifacts_path)
+        st.session_state.last_log_path = str(log_path)
+
     if run_checks:
         with st.status("Running checks...", expanded=True) as status:
             monitor = PKIMonitor(str(artifacts_path), str(log_path))
             ok = monitor.run_all_checks()
             status.update(label="Checks completed" if ok else "Checks finished with issues", state="complete")
+        
+        # Store results in session state
+        st.session_state.monitor_results = monitor
 
+    # Display summary and results from session state (persists across OCSP checks)
+    if st.session_state.monitor_results is not None:
         st.subheader("Summary")
-        render_summary(monitor)
+        render_summary(st.session_state.monitor_results)
 
         st.subheader("Session results")
-        st.dataframe(monitor.results, use_container_width=True, hide_index=True)
+        st.dataframe(st.session_state.monitor_results.results, use_container_width=True, hide_index=True)
 
-    elif show_summary_only:
-        monitor = PKIMonitor(str(artifacts_path), str(log_path))
-        if log_path.exists():
-            with open(log_path, "r", newline="") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    monitor.results.append(row)
-
-            st.subheader("Summary")
-            render_summary(monitor)
+    # Track if we should keep the OCSP expander open
+    if 'ocsp_expander_open' not in st.session_state:
+        st.session_state.ocsp_expander_open = False
+    
+    with st.expander("Manual OCSP Check...", expanded=st.session_state.ocsp_expander_open):
+        st.caption("Check certificate status using OCSP with a serial number")
+        
+        # Get available issuer certificates
+        crt_files = artifact_files.get("crt", [])
+        issuer_options = [str(f.resolve()) for f in crt_files if f.suffix in ['.crt', '.pem']]
+        
+        if issuer_options:
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
+                selected_issuer = st.selectbox(
+                    "Issuer Certificate",
+                    issuer_options,
+                    help="Select the CA/issuer certificate file"
+                )
+                serial_number = st.text_input(
+                    "Serial Number",
+                    placeholder="0x12c9a92ef05c17c292e09f56aa3d1cc5997e219f",
+                    help="Enter the serial number in hex format (with or without 0x prefix)"
+                )
+            
+            with col2:
+                ocsp_url = st.text_input(
+                    "OCSP URL",
+                    value="https://ocsp.eidpki.ee/",
+                    help="OCSP server URL"
+                )
+                st.markdown("<br>", unsafe_allow_html=True)  # Spacing
+            
+            if st.button("Check OCSP Status", type="primary"):
+                st.session_state.ocsp_expander_open = True
+                if serial_number.strip():
+                    with st.status("Checking OCSP status...", expanded=True) as status:
+                        try:
+                            # Ensure serial has 0x prefix if it's hex
+                            serial = serial_number.strip()
+                            if not serial.startswith('0x'):
+                                serial = '0x' + serial
+                            
+                            ocsp_checker = OCSPChecker(str(artifacts_path), str(log_path))
+                            result = ocsp_checker.check_ocsp_by_serial(ocsp_url, selected_issuer, serial)
+                            
+                            # Log the result
+                            with open(log_path, 'a', newline='') as f:
+                                writer = csv.writer(f)
+                                writer.writerow([
+                                    result.get('timestamp', ''),
+                                    result.get('type', ''),
+                                    result.get('url_or_host', ''),
+                                    result.get('status', ''),
+                                    result.get('http_code_or_port', ''),
+                                    result.get('ms', ''),
+                                    result.get('sha256_or_note', ''),
+                                    result.get('note', '')
+                                ])
+                            
+                            status.update(label="OCSP check completed", state="complete")
+                            
+                            # Display result
+                            if result.get('status') == 'ok':
+                                st.success(f"✅ OCSP Response: {result.get('note', 'Unknown')}")
+                            else:
+                                st.error(f"❌ OCSP check failed: {result.get('note', 'Unknown error')}")
+                            
+                            # Show full result details
+                            st.json(result)
+                            
+                        except Exception as e:
+                            status.update(label="OCSP check failed", state="error")
+                            st.error(f"Error: {e}")
+                else:
+                    st.warning("Please enter a serial number")
         else:
-            st.warning("No log file found. Run checks first.")
-
-    st.subheader("Latest log entries")
-    rows = read_csv_as_dicts(log_path, None)
-    if rows:
-        st.dataframe(rows[-last_n:], use_container_width=True, hide_index=True)
-
-        csv_buf = StringIO()
-        writer = csv.DictWriter(csv_buf, fieldnames=list(rows[0].keys()))
-        writer.writeheader()
-        writer.writerows(rows)
-        st.download_button(
-            label="Download full CSV",
-            data=csv_buf.getvalue(),
-            file_name=Path(log_path).name,
-            mime="text/csv",
-        )
-    else:
-        st.info("No results yet. Run checks to generate the CSV log.")
-
-    st.subheader("Manual OCSP Check by Serial Number")
-    st.caption("Check certificate status using OCSP with a serial number")
-    
-    # Get available issuer certificates
-    crt_files = artifact_files.get("crt", [])
-    issuer_options = [str(f.resolve()) for f in crt_files if f.suffix in ['.crt', '.pem']]
-    
-    if issuer_options:
-        col1, col2 = st.columns([3, 1])
-        
-        with col1:
-            selected_issuer = st.selectbox(
-                "Issuer Certificate",
-                issuer_options,
-                help="Select the CA/issuer certificate file"
-            )
-            serial_number = st.text_input(
-                "Serial Number",
-                placeholder="0x12c9a92ef05c17c292e09f56aa3d1cc5997e219f",
-                help="Enter the serial number in hex format (with or without 0x prefix)"
-            )
-        
-        with col2:
-            ocsp_url = st.text_input(
-                "OCSP URL",
-                value="https://ocsp.eidpki.ee/",
-                help="OCSP server URL"
-            )
-            st.markdown("<br>", unsafe_allow_html=True)  # Spacing
-        
-        if st.button("Check OCSP Status", type="primary"):
-            if serial_number.strip():
-                with st.status("Checking OCSP status...", expanded=True) as status:
-                    try:
-                        # Ensure serial has 0x prefix if it's hex
-                        serial = serial_number.strip()
-                        if not serial.startswith('0x'):
-                            serial = '0x' + serial
-                        
-                        ocsp_checker = OCSPChecker(str(artifacts_path), str(log_path))
-                        result = ocsp_checker.check_ocsp_by_serial(ocsp_url, selected_issuer, serial)
-                        
-                        # Log the result
-                        with open(log_path, 'a', newline='') as f:
-                            writer = csv.writer(f)
-                            writer.writerow([
-                                result.get('timestamp', ''),
-                                result.get('type', ''),
-                                result.get('url_or_host', ''),
-                                result.get('status', ''),
-                                result.get('http_code_or_port', ''),
-                                result.get('ms', ''),
-                                result.get('filepath_or_note', ''),
-                                result.get('sha256_or_note', ''),
-                                result.get('note', '')
-                            ])
-                        
-                        status.update(label="OCSP check completed", state="complete")
-                        
-                        # Display result
-                        if result.get('status') == 'ok':
-                            st.success(f"✅ OCSP Response: {result.get('note', 'Unknown')}")
-                        else:
-                            st.error(f"❌ OCSP check failed: {result.get('note', 'Unknown error')}")
-                        
-                        # Show full result details
-                        st.json(result)
-                        
-                    except Exception as e:
-                        status.update(label="OCSP check failed", state="error")
-                        st.error(f"Error: {e}")
-            else:
-                st.warning("Please enter a serial number")
-    else:
-        st.info("⚠️ No issuer certificates found. Download CRT files first by running checks.")
+            st.info("⚠️ No issuer certificates found. Download CRT files first by running checks.")
     
     st.markdown("---")
     

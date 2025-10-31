@@ -97,7 +97,6 @@ class PKIChecker:
                 'status': 'fail',
                 'http_code_or_port': '000',
                 'ms': '0',
-                'filepath_or_note': '',
                 'sha256_or_note': '',
                 'note': 'URL not accessible'
             })
@@ -136,7 +135,6 @@ class PKIChecker:
                         'status': status,
                         'http_code_or_port': str(http_code),
                         'ms': str(duration_ms),
-                        'filepath_or_note': '',
                         'sha256_or_note': '',
                         'note': f'Content-Type: {content_type}'
                     }
@@ -169,7 +167,6 @@ class PKIChecker:
                     'status': status,
                     'http_code_or_port': str(http_code),
                     'ms': str(duration_ms),
-                    'filepath_or_note': '',
                     'sha256_or_note': '',
                     'note': f'Content-Type: {content_type}'
                 }
@@ -185,7 +182,6 @@ class PKIChecker:
                 'status': 'fail',
                 'http_code_or_port': '000',
                 'ms': str(duration_ms),
-                'filepath_or_note': '',
                 'sha256_or_note': '',
                 'note': str(e)
             }
@@ -230,7 +226,6 @@ class PKIChecker:
                 'status': 'ok',
                 'http_code_or_port': '200',
                 'ms': str(duration_ms),
-                'filepath_or_note': str(filepath),
                 'sha256_or_note': sha256_hash,
                 'note': ''
             }
@@ -246,7 +241,6 @@ class PKIChecker:
                 'status': 'fail',
                 'http_code_or_port': '000',
                 'ms': str(duration_ms),
-                'filepath_or_note': '',
                 'sha256_or_note': '',
                 'note': str(e)
             }

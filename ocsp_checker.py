@@ -30,7 +30,6 @@ class OCSPChecker:
         
         # Expected certificate files
         self.ca_cert = self.artifacts_dir / "crt" / "ESTEID2025.crt"
-        self.test_cert = self.artifacts_dir / "crt" / "mycert.crt"
     
     def run_checks(self) -> List[Dict]:
         """Run all OCSP checks and return results."""
@@ -77,7 +76,6 @@ class OCSPChecker:
                         'status': status,
                         'http_code_or_port': str(http_code),
                         'ms': str(duration_ms),
-                        'filepath_or_note': '',
                         'sha256_or_note': '',
                         'note': ''
                     }
@@ -108,7 +106,6 @@ class OCSPChecker:
                     'status': status,
                     'http_code_or_port': str(http_code),
                     'ms': str(duration_ms),
-                    'filepath_or_note': '',
                     'sha256_or_note': '',
                     'note': ''
                 }
@@ -124,18 +121,17 @@ class OCSPChecker:
                 'status': 'fail',
                 'http_code_or_port': '000',
                 'ms': str(duration_ms),
-                'filepath_or_note': '',
                 'sha256_or_note': '',
                 'note': str(e)
             }
     
     def _check_ocsp_status(self, url: str) -> Dict:
-        """Check certificate status via OCSP using OpenSSL."""
+        """Check certificate status via OCSP using serial number instead of certificate file."""
         timestamp = self._timestamp()
         
         print(f"[{timestamp}] Checking certificate OCSP status via {url}")
         
-        # Check if required certificate files exist
+        # Check if CA certificate exists (needed for issuer)
         if not self.ca_cert.exists():
             print(f"[{timestamp}] ❌ CA certificate not found: {self.ca_cert}")
             return {
@@ -145,126 +141,18 @@ class OCSPChecker:
                 'status': 'fail',
                 'http_code_or_port': '000',
                 'ms': '0',
-                'filepath_or_note': '',
                 'sha256_or_note': '',
                 'note': f'CA certificate not found: {self.ca_cert}'
             }
         
-        if not self.test_cert.exists():
-            print(f"[{timestamp}] ❌ Test certificate not found: {self.test_cert}")
-            return {
-                'timestamp': timestamp,
-                'type': 'ocsp_status',
-                'url_or_host': url,
-                'status': 'fail',
-                'http_code_or_port': '000',
-                'ms': '0',
-                'filepath_or_note': '',
-                'sha256_or_note': '',
-                'note': f'Test certificate not found: {self.test_cert}'
-            }
+        # Use a known test serial number for OCSP checks
+        # This avoids needing the actual certificate file
+        test_serial = '0xAAA'
         
-        # Run OpenSSL OCSP command
-        try:
-            with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.txt') as tmp_file:
-                tmp_path = tmp_file.name
-            
-            # Extract hostname from URL for Host header
-            parsed_url = urlparse(url)
-            hostname = parsed_url.hostname
-            
-            # Build OpenSSL OCSP command
-            cmd = [
-                'openssl', 'ocsp',
-                '-issuer', str(self.ca_cert),
-                '-cert', str(self.test_cert),
-                '-url', url,
-                '-header', f'HOST={hostname}',
-                '-resp_text',
-                '-noverify',
-                '-timeout', '10'
-            ]
-            
-            # Run the command
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=15
-            )
-            
-            # Write output to temp file for analysis
-            with open(tmp_path, 'w') as f:
-                f.write(result.stdout)
-                f.write(result.stderr)
-            
-            if result.returncode == 0:
-                # Parse OCSP response
-                status = self._parse_ocsp_response(result.stdout)
-                sha256_hash = self._calculate_file_sha256(tmp_path)
-                
-                print(f"[{timestamp}] ✅ OCSP response: {status}")
-                
-                return {
-                    'timestamp': timestamp,
-                    'type': 'ocsp_status',
-                    'url_or_host': url,
-                    'status': 'ok',
-                    'http_code_or_port': '200',
-                    'ms': '0',
-                    'filepath_or_note': tmp_path,
-                    'sha256_or_note': sha256_hash,
-                    'note': status
-                }
-            else:
-                print(f"[{timestamp}] ❌ OCSP request error: {result.stderr}")
-                return {
-                    'timestamp': timestamp,
-                    'type': 'ocsp_status',
-                    'url_or_host': url,
-                    'status': 'fail',
-                    'http_code_or_port': '000',
-                    'ms': '0',
-                    'filepath_or_note': tmp_path,
-                    'sha256_or_note': '',
-                    'note': f'OpenSSL error: {result.stderr}'
-                }
-        
-        except subprocess.TimeoutExpired:
-            print(f"[{timestamp}] ❌ OCSP request timeout")
-            return {
-                'timestamp': timestamp,
-                'type': 'ocsp_status',
-                'url_or_host': url,
-                'status': 'fail',
-                'http_code_or_port': '000',
-                'ms': '0',
-                'filepath_or_note': '',
-                'sha256_or_note': '',
-                'note': 'Request timeout'
-            }
-        except Exception as e:
-            print(f"[{timestamp}] ❌ OCSP request error: {e}")
-            return {
-                'timestamp': timestamp,
-                'type': 'ocsp_status',
-                'url_or_host': url,
-                'status': 'fail',
-                'http_code_or_port': '000',
-                'ms': '0',
-                'filepath_or_note': '',
-                'sha256_or_note': '',
-                'note': str(e)
-            }
-        finally:
-            # Clean up temp file
-            if 'tmp_path' in locals() and os.path.exists(tmp_path):
-                try:
-                    os.unlink(tmp_path)
-                except OSError:
-                    pass
+        # Use the existing check_ocsp_by_serial method
+        return self.check_ocsp_by_serial(url, str(self.ca_cert), test_serial, result_type='ocsp_status')
     
-    def check_ocsp_by_serial(self, url: str, issuer_cert: str, serial: str) -> Dict:
+    def check_ocsp_by_serial(self, url: str, issuer_cert: str, serial: str, result_type: str = 'ocsp_status_by_serial') -> Dict:
         """Check certificate status via OCSP using serial number."""
         timestamp = self._timestamp()
         start_time = time.time()
@@ -278,12 +166,11 @@ class OCSPChecker:
             duration_ms = int((time.time() - start_time) * 1000)
             return {
                 'timestamp': timestamp,
-                'type': 'ocsp_status_by_serial',
+                'type': result_type,
                 'url_or_host': url,
                 'status': 'fail',
                 'http_code_or_port': '000',
                 'ms': str(duration_ms),
-                'filepath_or_note': '',
                 'sha256_or_note': '',
                 'note': f'Issuer certificate not found: {issuer_cert}'
             }
@@ -332,12 +219,11 @@ class OCSPChecker:
                 
                 return {
                     'timestamp': timestamp,
-                    'type': 'ocsp_status_by_serial',
+                    'type': result_type,
                     'url_or_host': url,
                     'status': 'ok',
                     'http_code_or_port': '200',
                     'ms': str(duration_ms),
-                    'filepath_or_note': tmp_path,
                     'sha256_or_note': sha256_hash,
                     'note': f"{status} (serial: {serial})"
                 }
@@ -345,12 +231,11 @@ class OCSPChecker:
                 print(f"[{timestamp}] ❌ OCSP request error for serial {serial}: {result.stderr}")
                 return {
                     'timestamp': timestamp,
-                    'type': 'ocsp_status_by_serial',
+                    'type': result_type,
                     'url_or_host': url,
                     'status': 'fail',
                     'http_code_or_port': '000',
                     'ms': str(duration_ms),
-                    'filepath_or_note': tmp_path,
                     'sha256_or_note': '',
                     'note': f'OpenSSL error: {result.stderr}'
                 }
@@ -360,12 +245,11 @@ class OCSPChecker:
             print(f"[{timestamp}] ❌ OCSP request timeout for serial {serial}")
             return {
                 'timestamp': timestamp,
-                'type': 'ocsp_status_by_serial',
+                'type': result_type,
                 'url_or_host': url,
                 'status': 'fail',
                 'http_code_or_port': '000',
                 'ms': str(duration_ms),
-                'filepath_or_note': '',
                 'sha256_or_note': '',
                 'note': 'Request timeout'
             }
@@ -374,12 +258,11 @@ class OCSPChecker:
             print(f"[{timestamp}] ❌ OCSP request error for serial {serial}: {e}")
             return {
                 'timestamp': timestamp,
-                'type': 'ocsp_status_by_serial',
+                'type': result_type,
                 'url_or_host': url,
                 'status': 'fail',
                 'http_code_or_port': '000',
                 'ms': str(duration_ms),
-                'filepath_or_note': '',
                 'sha256_or_note': '',
                 'note': str(e)
             }
@@ -392,17 +275,35 @@ class OCSPChecker:
                     pass
     
     def _parse_ocsp_response(self, response: str) -> str:
-        """Parse OCSP response to extract certificate status."""
+        """Parse OCSP response to extract certificate status and revocation info."""
         lines = response.split('\n')
+        
+        status = None
+        revocation_time = None
+        revocation_reason = None
         
         for line in lines:
             if 'Cert Status:' in line:
                 # Extract status after the colon
                 status = line.split('Cert Status:')[1].strip()
-                return status
+            elif 'Revocation Time:' in line:
+                # Extract revocation time
+                revocation_time = line.split('Revocation Time:')[1].strip()
+            elif 'Revocation Reason:' in line:
+                # Extract revocation reason
+                revocation_reason = line.split('Revocation Reason:')[1].strip()
         
-        # If no status found, return unknown
-        return 'unknown'
+        if status is None:
+            return 'unknown'
+        
+        # Format the response with revocation info if available
+        if revocation_time:
+            result = f"{status}, Revocation Time: {revocation_time}"
+            if revocation_reason:
+                result += f", Reason: {revocation_reason}"
+            return result
+        
+        return status
     
     def _calculate_file_sha256(self, filepath: str) -> str:
         """Calculate SHA256 hash of a file."""

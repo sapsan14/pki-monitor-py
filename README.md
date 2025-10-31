@@ -206,7 +206,6 @@ The application generates a CSV file with the following columns:
 - `status`: Result status (ok/fail)
 - `http_code_or_port`: HTTP response code or port number
 - `ms`: Response time in milliseconds
-- `filepath_or_note`: Local file path or additional note
 - `sha256_or_note`: SHA256 hash or additional note
 - `note`: Additional information or error details
 
