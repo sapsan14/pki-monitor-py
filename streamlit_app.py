@@ -87,16 +87,26 @@ def main():
         else:
             st.sidebar.warning("No secrets found at all!")
         
-        # Try to get auth config
+        # Try to get auth config - first check for [auth] section, then top-level
         auth_config = st.secrets.get("auth", {})
-        USER = auth_config.get("username", "admin")
-        PASSWORD_HASH = auth_config.get("password_hash", "")
+        USER = "admin"
+        plain_password = ""
+        PASSWORD_HASH = ""
         
-        # Debug: show what was loaded
-        if not PASSWORD_HASH and "password" in auth_config:
-            PASSWORD_HASH = hashlib.sha256(auth_config["password"].encode()).hexdigest()
-            st.sidebar.success("✅ Using password from secrets")
+        if not auth_config:
+            # Fallback to top-level secrets
+            USER = st.secrets.get("username", "admin")
+            plain_password = st.secrets.get("password", "")
         else:
+            USER = auth_config.get("username", "admin")
+            plain_password = auth_config.get("password", "")
+            PASSWORD_HASH = auth_config.get("password_hash", "")
+        
+        # Hash the password if we have it
+        if plain_password:
+            PASSWORD_HASH = hashlib.sha256(plain_password.encode()).hexdigest()
+            st.sidebar.success("✅ Using password from secrets")
+        elif not PASSWORD_HASH:
             st.sidebar.info("⚠️ No password in secrets")
         
         # If still empty, use default hash
