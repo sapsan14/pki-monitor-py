@@ -17,6 +17,7 @@ import streamlit as st
 import hashlib
 
 from pki_monitor import PKIMonitor
+from ocsp_checker import OCSPChecker
 
 
 def read_csv_as_dicts(csv_path: Path, max_rows: int | None = None) -> List[Dict[str, str]]:
@@ -130,6 +131,9 @@ def main():
 
     log_path = Path(log_csv).resolve()
     artifacts_path = Path(artifacts_dir).resolve()
+    
+    # Get artifact files list for UI
+    artifact_files = list_artifacts(artifacts_path)
 
     if run_checks:
         with st.status("Running checks...", expanded=True) as status:
@@ -174,8 +178,85 @@ def main():
     else:
         st.info("No results yet. Run checks to generate the CSV log.")
 
+    st.subheader("Manual OCSP Check by Serial Number")
+    st.caption("Check certificate status using OCSP with a serial number")
+    
+    # Get available issuer certificates
+    crt_files = artifact_files.get("crt", [])
+    issuer_options = [str(f.resolve()) for f in crt_files if f.suffix in ['.crt', '.pem']]
+    
+    if issuer_options:
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            selected_issuer = st.selectbox(
+                "Issuer Certificate",
+                issuer_options,
+                help="Select the CA/issuer certificate file"
+            )
+            serial_number = st.text_input(
+                "Serial Number",
+                placeholder="0x12c9a92ef05c17c292e09f56aa3d1cc5997e219f",
+                help="Enter the serial number in hex format (with or without 0x prefix)"
+            )
+        
+        with col2:
+            ocsp_url = st.text_input(
+                "OCSP URL",
+                value="https://ocsp.eidpki.ee/",
+                help="OCSP server URL"
+            )
+            st.markdown("<br>", unsafe_allow_html=True)  # Spacing
+        
+        if st.button("Check OCSP Status", type="primary"):
+            if serial_number.strip():
+                with st.status("Checking OCSP status...", expanded=True) as status:
+                    try:
+                        # Ensure serial has 0x prefix if it's hex
+                        serial = serial_number.strip()
+                        if not serial.startswith('0x'):
+                            serial = '0x' + serial
+                        
+                        ocsp_checker = OCSPChecker(str(artifacts_path), str(log_path))
+                        result = ocsp_checker.check_ocsp_by_serial(ocsp_url, selected_issuer, serial)
+                        
+                        # Log the result
+                        with open(log_path, 'a', newline='') as f:
+                            writer = csv.writer(f)
+                            writer.writerow([
+                                result.get('timestamp', ''),
+                                result.get('type', ''),
+                                result.get('url_or_host', ''),
+                                result.get('status', ''),
+                                result.get('http_code_or_port', ''),
+                                result.get('ms', ''),
+                                result.get('filepath_or_note', ''),
+                                result.get('sha256_or_note', ''),
+                                result.get('note', '')
+                            ])
+                        
+                        status.update(label="OCSP check completed", state="complete")
+                        
+                        # Display result
+                        if result.get('status') == 'ok':
+                            st.success(f"✅ OCSP Response: {result.get('note', 'Unknown')}")
+                        else:
+                            st.error(f"❌ OCSP check failed: {result.get('note', 'Unknown error')}")
+                        
+                        # Show full result details
+                        st.json(result)
+                        
+                    except Exception as e:
+                        status.update(label="OCSP check failed", state="error")
+                        st.error(f"Error: {e}")
+            else:
+                st.warning("Please enter a serial number")
+    else:
+        st.info("⚠️ No issuer certificates found. Download CRT files first by running checks.")
+    
+    st.markdown("---")
+    
     st.subheader("Downloaded Artifacts")
-    artifact_files = list_artifacts(artifacts_path)
     tabs = st.tabs(["PDF", "CRL", "CRT"])
     for i, t in enumerate(["pdf", "crl", "crt"]):
         with tabs[i]:

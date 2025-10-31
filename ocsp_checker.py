@@ -264,6 +264,133 @@ class OCSPChecker:
                 except OSError:
                     pass
     
+    def check_ocsp_by_serial(self, url: str, issuer_cert: str, serial: str) -> Dict:
+        """Check certificate status via OCSP using serial number."""
+        timestamp = self._timestamp()
+        start_time = time.time()
+        
+        print(f"[{timestamp}] Checking OCSP status for serial {serial} via {url}")
+        
+        # Check if issuer certificate exists
+        issuer_path = Path(issuer_cert)
+        if not issuer_path.exists():
+            print(f"[{timestamp}] ❌ Issuer certificate not found: {issuer_cert}")
+            duration_ms = int((time.time() - start_time) * 1000)
+            return {
+                'timestamp': timestamp,
+                'type': 'ocsp_status_by_serial',
+                'url_or_host': url,
+                'status': 'fail',
+                'http_code_or_port': '000',
+                'ms': str(duration_ms),
+                'filepath_or_note': '',
+                'sha256_or_note': '',
+                'note': f'Issuer certificate not found: {issuer_cert}'
+            }
+        
+        # Run OpenSSL OCSP command with serial number
+        try:
+            with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.txt') as tmp_file:
+                tmp_path = tmp_file.name
+            
+            # Extract hostname from URL for Host header
+            parsed_url = urlparse(url)
+            hostname = parsed_url.hostname
+            
+            # Build OpenSSL OCSP command with serial number
+            cmd = [
+                'openssl', 'ocsp',
+                '-url', url,
+                '-issuer', str(issuer_path),
+                '-serial', serial,
+                '-resp_text',
+                '-noverify',
+                '-timeout', '10'
+            ]
+            
+            # Run the command
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=15
+            )
+            
+            duration_ms = int((time.time() - start_time) * 1000)
+            
+            # Write output to temp file for analysis
+            with open(tmp_path, 'w') as f:
+                f.write(result.stdout)
+                f.write(result.stderr)
+            
+            if result.returncode == 0:
+                # Parse OCSP response
+                status = self._parse_ocsp_response(result.stdout)
+                sha256_hash = self._calculate_file_sha256(tmp_path)
+                
+                print(f"[{timestamp}] ✅ OCSP response for serial {serial}: {status}")
+                
+                return {
+                    'timestamp': timestamp,
+                    'type': 'ocsp_status_by_serial',
+                    'url_or_host': url,
+                    'status': 'ok',
+                    'http_code_or_port': '200',
+                    'ms': str(duration_ms),
+                    'filepath_or_note': tmp_path,
+                    'sha256_or_note': sha256_hash,
+                    'note': f"{status} (serial: {serial})"
+                }
+            else:
+                print(f"[{timestamp}] ❌ OCSP request error for serial {serial}: {result.stderr}")
+                return {
+                    'timestamp': timestamp,
+                    'type': 'ocsp_status_by_serial',
+                    'url_or_host': url,
+                    'status': 'fail',
+                    'http_code_or_port': '000',
+                    'ms': str(duration_ms),
+                    'filepath_or_note': tmp_path,
+                    'sha256_or_note': '',
+                    'note': f'OpenSSL error: {result.stderr}'
+                }
+        
+        except subprocess.TimeoutExpired:
+            duration_ms = int((time.time() - start_time) * 1000)
+            print(f"[{timestamp}] ❌ OCSP request timeout for serial {serial}")
+            return {
+                'timestamp': timestamp,
+                'type': 'ocsp_status_by_serial',
+                'url_or_host': url,
+                'status': 'fail',
+                'http_code_or_port': '000',
+                'ms': str(duration_ms),
+                'filepath_or_note': '',
+                'sha256_or_note': '',
+                'note': 'Request timeout'
+            }
+        except Exception as e:
+            duration_ms = int((time.time() - start_time) * 1000)
+            print(f"[{timestamp}] ❌ OCSP request error for serial {serial}: {e}")
+            return {
+                'timestamp': timestamp,
+                'type': 'ocsp_status_by_serial',
+                'url_or_host': url,
+                'status': 'fail',
+                'http_code_or_port': '000',
+                'ms': str(duration_ms),
+                'filepath_or_note': '',
+                'sha256_or_note': '',
+                'note': str(e)
+            }
+        finally:
+            # Clean up temp file
+            if 'tmp_path' in locals() and os.path.exists(tmp_path):
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+    
     def _parse_ocsp_response(self, response: str) -> str:
         """Parse OCSP response to extract certificate status."""
         lines = response.split('\n')
